@@ -77,7 +77,7 @@ require("lazy").setup({
         config = function()
             require("mason").setup()
             require("mason-lspconfig").setup({
-                ensure_installed = { "pyright", "ruff" },
+                ensure_installed = { "pyright", "ruff", "clangd" },
                 automatic_installation = true,
             })
 
@@ -110,6 +110,7 @@ require("lazy").setup({
                             autoSearchPaths = true,
                             useLibraryCodeForTypes = true,
                             diagnosticMode = "workspace",
+                            -- extraPaths = {}, -- ROS2 paths
                         }
                     }
                 }
@@ -122,6 +123,11 @@ require("lazy").setup({
                     client.server_capabilities.hoverProvider = false
                     on_attach(client, bufnr)
                 end,
+            })
+
+            -- For clangd
+            lspconfig.clangd.setup({
+                on_attach = on_attach,
             })
         end
     },
@@ -188,7 +194,7 @@ require("lazy").setup({
         build = ":TSUpdate",
         config = function()
             require("nvim-treesitter.configs").setup({
-                ensure_installed = { "python", "lua", "json", "yaml", "toml", "markdown" },
+                ensure_installed = { "python", "lua", "json", "yaml", "toml", "markdown", "xml" },
                 highlight = { enable = true },
                 indent = { enable = true },
             })
@@ -377,7 +383,7 @@ function RunFastAPI()
     -- Send uvicorn run command to terminal
     local module_name = main_file:gsub(".*/", ""):gsub("%.py$", "")
     vim.api.nvim_chan_send(job_id,
-        string.format('clear && uvicorn %s:app --reload --host 0.0.0.0 --port 8000\n', module_name))
+        string.format('clear && uvicorn %s:app --reload --host 127.0.0.1 --port 8000\n', module_name))
 end
 
 -- Run Python Script
