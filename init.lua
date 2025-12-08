@@ -67,6 +67,12 @@ require("lazy").setup({
         end
     },
 
+    -- Blur Display
+    {
+        "typicode/bg.nvim",
+        lazy = false
+    },
+
     -- LSP Config
     {
         "neovim/nvim-lspconfig",
@@ -101,7 +107,7 @@ require("lazy").setup({
             end
 
             -- Pyright for type checking and intelligent completions
-            lspconfig.pyright.setup({
+            vim.lsp.config('pyright', {
                 on_attach = on_attach,
                 settings = {
                     python = {
@@ -117,7 +123,7 @@ require("lazy").setup({
             })
 
             -- Ruff for fast linting and formatting (replaces ruff_lsp)
-            lspconfig.ruff.setup({
+            vim.lsp.config('ruff', {
                 on_attach = function(client, bufnr)
                     -- Disable hover in favor of Pyright
                     client.server_capabilities.hoverProvider = false
@@ -126,7 +132,7 @@ require("lazy").setup({
             })
 
             -- For clangd
-            lspconfig.clangd.setup({
+            vim.lsp.config('clangd', {
                 on_attach = on_attach,
             })
         end
@@ -154,7 +160,7 @@ require("lazy").setup({
                 },
                 mapping = cmp.mapping.preset.insert({
                     ['<C-b>'] = cmp.mapping.scroll_docs(-4),
-                    ['<C-f>'] = cmp.mapping.scroll_docs(4),
+                    ['<C-t>'] = cmp.mapping.scroll_docs(4),
                     ['<C-Space>'] = cmp.mapping.complete(),
                     ['<C-e>'] = cmp.mapping.abort(),
                     ['<CR>'] = cmp.mapping.confirm({ select = true }),
@@ -318,6 +324,7 @@ require("lazy").setup({
         end
     },
 
+
     -- Auto-pairs
     {
         "windwp/nvim-autopairs",
@@ -336,9 +343,10 @@ function RunFastAPI()
     vim.cmd('write') -- Save current file
 
     -- First: capture and set CWD before creating terminal
-    local current_cwd = vim.fn.expand("%:p:h")
-    if current_cwd ~= nil and current_cwd ~= "" then
-        vim.cmd('lcd ' .. current_cwd)
+    local current_file = vim.fn.expand("%:p")
+    local project_root = vim.fn.fnamemodify(current_file, ":h:h")
+    if project_root ~= nil and project_root ~= "" then
+        vim.cmd('lcd ' .. project_root)
     else
         vim.notify("Invalid buffer path; cannot set working directory.", vim.log.levels.WARN)
         return
@@ -359,15 +367,11 @@ function RunFastAPI()
     vim.wo.relativenumber = false
 
     -- Build full paths
-    local main_file_path  = vim.fs.joinpath(current_cwd, "main.py")
-    local app_file_path   = vim.fs.joinpath(current_cwd, "app.py")
 
     -- Try to find main.py or app.py
     local main_file       = nil
-    if vim.fn.filereadable(main_file_path) == 1 then
-        main_file = main_file_path
-    elseif vim.fn.filereadable(app_file_path) == 1 then
-        main_file = app_file_path
+    if vim.fn.filereadable(current_file) == 1 then
+        main_file = current_file
     else
         vim.notify("Neither main.py nor app.py found in the current directory", vim.log.levels.ERROR)
         return
@@ -381,9 +385,20 @@ function RunFastAPI()
     end
 
     -- Send uvicorn run command to terminal
-    local module_name = main_file:gsub(".*/", ""):gsub("%.py$", "")
+    -- for fix later, gsub replaces all occurences of a pattern in a string w/ the replacement
+    -- string.gsub(original_string, pattern, replacement)
+    -- Derive relative path from root (assuming you're in project root)
+    local rel_path = vim.fn.fnamemodify(main_file, ":.:r") -- removes extension and gives relative path
+    local module_name = rel_path:gsub("/", ".")            -- converts path into module notation
+
     vim.api.nvim_chan_send(job_id,
-        string.format('clear && uvicorn %s:app --reload --host 127.0.0.1 --port 8000\n', module_name))
+        string.format('clear && uvicorn %s:app --reload --log-level debug --host 127.0.0.1 --port 8000\n', module_name))
+
+    -- You can check with `:messages` command, uncomment them first (obviously)
+    vim.notify("CWD: " .. current_file)
+    vim.notify("Main file: " .. main_file)
+    vim.notify("Rel path: " .. rel_path)
+    vim.notify("Module path: " .. module_name)
 end
 
 -- Run Python Script
@@ -410,18 +425,21 @@ end
 
 -- Run Pytest
 function RunPytest()
-    vim.cmd('write')
+    vim.cmd('write') -- Saves current buffer
 
+    -- Closes the open terminal
     if term_win and vim.api.nvim_win_is_valid(term_win) then
         vim.api.nvim_win_close(term_win, true)
     end
 
+    -- Create new terminal window of 15 lines
     vim.cmd('botright 15new')
     vim.cmd('term')
 
     term_win = vim.api.nvim_get_current_win()
     term_buf = vim.api.nvim_get_current_buf()
 
+    -- Display numbers or not
     vim.wo.number = false
     vim.wo.relativenumber = false
 
@@ -455,7 +473,7 @@ vim.keymap.set('t', '<F4>', '<C-\\><C-n>:lua ToggleTerminal()<CR>',
 
 -- File navigation
 vim.keymap.set('n', '<C-n>', ':Neotree toggle<CR>', { desc = "Toggle Neo-tree", noremap = true, silent = true })
-vim.keymap.set('n', '<C-p>', ':Telescope find_files<CR>', { desc = "Find Files", noremap = true, silent = true })
+vim.keymap.set('n', '<C-f>', ':Telescope find_files<CR>', { desc = "Find Files", noremap = true, silent = true })
 vim.keymap.set('n', '<C-g>', ':Telescope live_grep<CR>', { desc = "Live Grep", noremap = true, silent = true })
 
 -- Save shortcuts
