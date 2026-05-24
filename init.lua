@@ -67,10 +67,26 @@ require("lazy").setup({
         end
     },
 
+    -- Harpoon
+    {
+        "ThePrimeagen/harpoon",
+        branch = "harpoon2",
+        dependencies = { "nvim-lua/plenary.nvim" }
+    },
+
+    --[[
     -- Blur Display
     {
         "typicode/bg.nvim",
         lazy = false
+    },
+]]
+
+    -- Rust LSP
+    {
+        'mrcjkb/rustaceanvim',
+        version = '^6', -- Recommended
+        lazy = false,   -- This plugin is already lazy
     },
 
     -- LSP Config
@@ -358,7 +374,7 @@ function RunFastAPI()
     end
 
     -- Create new terminal
-    vim.cmd('botright 15new')
+    vim.cmd('botright 5new')
     vim.cmd('term')
 
     term_win              = vim.api.nvim_get_current_win()
@@ -401,16 +417,27 @@ function RunFastAPI()
     vim.notify("Module path: " .. module_name)
 end
 
--- Run Python Script
+-- Run Python Module
 function RunPython()
-    local file = vim.fn.expand('%:p')
     vim.cmd('write')
+
+    local file = vim.fn.expand('%:p')
+    local cwd = vim.fn.getcwd()
+
+    -- convert:
+    -- /path/project/buune/app.py
+    -- into:
+    -- buune.app
+    local module = file
+        :gsub(cwd .. "/", "")
+        :gsub("%.py$", "")
+        :gsub("/", ".")
 
     if term_win and vim.api.nvim_win_is_valid(term_win) then
         vim.api.nvim_win_close(term_win, true)
     end
 
-    vim.cmd('botright 15new')
+    vim.cmd('botright 5new')
     vim.cmd('term')
 
     term_win = vim.api.nvim_get_current_win()
@@ -419,8 +446,10 @@ function RunPython()
     vim.wo.number = false
     vim.wo.relativenumber = false
 
-    vim.api.nvim_chan_send(vim.b.terminal_job_id,
-        string.format('clear && python3 "%s"\n', file))
+    vim.api.nvim_chan_send(
+        vim.b.terminal_job_id,
+        string.format('clear && python3 -m %s\n', module)
+    )
 end
 
 -- Run Pytest
@@ -433,7 +462,7 @@ function RunPytest()
     end
 
     -- Create new terminal window of 15 lines
-    vim.cmd('botright 15new')
+    vim.cmd('botright 5new')
     vim.cmd('term')
 
     term_win = vim.api.nvim_get_current_win()
@@ -453,7 +482,7 @@ function ToggleTerminal()
         term_win = nil
         term_buf = nil
     else
-        vim.cmd('botright 15new')
+        vim.cmd('botright 5new')
         vim.cmd('term')
         term_win = vim.api.nvim_get_current_win()
         term_buf = vim.api.nvim_get_current_buf()
@@ -462,6 +491,49 @@ function ToggleTerminal()
         vim.cmd('startinsert')
     end
 end
+
+-- Set telescope to use harpoon
+local harpoon = require('harpoon')
+harpoon:setup({})
+
+-- basic telescope configuration
+local conf = require("telescope.config").values
+local function toggle_telescope(harpoon_files)
+    local file_paths = {}
+    for _, item in ipairs(harpoon_files.items) do
+        table.insert(file_paths, item.value)
+    end
+
+    require("telescope.pickers").new({}, {
+        prompt_title = "Harpoon",
+        finder = require("telescope.finders").new_table({
+            results = file_paths,
+        }),
+        previewer = conf.file_previewer({}),
+        sorter = conf.generic_sorter({}),
+    }):find()
+end
+
+vim.keymap.set("n", "<C-e>", function() toggle_telescope(harpoon:list()) end,
+    { desc = "Open harpoon window" })
+
+-- Harpoon Keymaps
+
+-- REQUIRED
+harpoon:setup()
+-- REQUIRED
+
+vim.keymap.set("n", "<leader>a", function() harpoon:list():add() end)
+vim.keymap.set("n", "<C-e>", function() harpoon.ui:toggle_quick_menu(harpoon:list()) end)
+
+vim.keymap.set("n", "<C-p>", function() harpoon:list():select(1) end)
+vim.keymap.set("n", "<C-t>", function() harpoon:list():select(2) end)
+vim.keymap.set("n", "<C-i>", function() harpoon:list():select(3) end)
+vim.keymap.set("n", "<C-y>", function() harpoon:list():select(4) end)
+
+-- Toggle previous & next buffers stored within Harpoon list
+vim.keymap.set("n", "<C-S-P>", function() harpoon:list():prev() end)
+vim.keymap.set("n", "<C-o>", function() harpoon:list():next() end)
 
 -- Keymaps
 vim.keymap.set('n', '<F5>', RunPython, { desc = "Run Python Script", noremap = true, silent = true })
