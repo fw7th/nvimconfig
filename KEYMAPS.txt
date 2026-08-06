@@ -1,0 +1,157 @@
+================================================================================
+ NEOVIM KEYMAP REFERENCE
+ Leader key: <Space>
+ Generated from the modular config under ~/.config/nvim/lua/
+ See IDIOSYNCRASIES.txt for overlaps, gotchas, and changelog from the old config.
+================================================================================
+
+Legend: [n] normal mode  [i] insert mode  [t] terminal mode
+
+--------------------------------------------------------------------------------
+ GENERAL (lua/config/keymaps.lua)
+--------------------------------------------------------------------------------
+[n] <C-s>       Save file
+[i] <C-s>       Save file (drops to normal mode, saves, back to insert)
+[t] <Esc>       Exit terminal mode
+[n] <C-h/j/k/l> Move to window left/down/up/right
+
+--------------------------------------------------------------------------------
+ TERMINAL / RUNNERS (lua/config/terminal.lua)
+--------------------------------------------------------------------------------
+[n] <F4>        Toggle scratch terminal (open/close, no command run)
+[t] <F4>        Toggle scratch terminal (from inside terminal mode)
+[n] <F5>        Run current file as a Python module (python3 -m ...)
+[n] <F6>        Run current file as a FastAPI/uvicorn dev server
+[n] <F7>        Run pytest -v in the current directory
+
+--------------------------------------------------------------------------------
+ LSP (lua/plugins/lsp.lua) -- active on any buffer with an attached LSP
+ Languages: Python (pyright+ruff), C/C++ (clangd), TypeScript/JS (ts_ls),
+            Rust (rust-analyzer via rustaceanvim, see its own section below)
+--------------------------------------------------------------------------------
+[n] gd          Go to definition
+[n] gr          Find references
+[n] gi          Go to implementation
+[n] K           Hover documentation
+[n] <leader>rn  Rename symbol
+[n] <leader>ca  Code action
+[n] <leader>f   Format buffer (async) -- see FORMATTING below for what runs per language
+[n] [d          Previous diagnostic
+[n] ]d          Next diagnostic
+[n] <leader>d   Open diagnostic float (details for line)
+
+--------------------------------------------------------------------------------
+ FORMATTING (lua/plugins/conform.lua) -- what <leader>f actually runs, by filetype
+--------------------------------------------------------------------------------
+  Python              ruff_format, ruff_organize_imports
+  C / C++             clang_format  (uses project .clang-format if present,
+                                     else clang-format's default LLVM style)
+  TypeScript/JS(X)    prettier
+  Rust                rustfmt, via rust-analyzer/rustaceanvim (not conform)
+
+  Also runs automatically on save (format_on_save), same mapping as above.
+
+--------------------------------------------------------------------------------
+ DEBUGGING / DAP (lua/plugins/dap/init.lua) -- universal, any language
+ Adapters configured: codelldb (C/C++), debugpy (Python),
+                       js-debug/pwa-node (TypeScript/JavaScript)
+                       Rust uses rustaceanvim's own DAP integration (below)
+--------------------------------------------------------------------------------
+[n] <F1>        Continue / Start debugging
+[n] <F2>        Step over
+[n] <F3>        Step into
+[n] <S-F3>      Step out
+[n] <leader>b   Toggle breakpoint
+[n] <leader>B   Set conditional breakpoint (prompts for condition)
+[n] <leader>dr  Toggle DAP REPL
+[n] <leader>dl  Re-run last debug configuration
+[n] <leader>dt  Terminate debug session
+[n] <leader>du  Toggle dapui panels
+
+--------------------------------------------------------------------------------
+ CMAKE / C++ DEBUGGING (lua/plugins/dap/cmake.lua)
+--------------------------------------------------------------------------------
+[n] <leader>cg  CMake: Generate (configure build dir)
+[n] <leader>cb  CMake: Build
+[n] <leader>cr  CMake: Run selected target
+[n] <leader>cd  CMake: Debug (builds + launches DAP session directly)
+[n] <leader>ct  CMake: Select launch target
+[n] <leader>cc  CMake: Clean
+
+  Typical C++ debug flow:
+    1. <leader>cg   generate the CMake build dir (once per project / after CMakeLists changes)
+    2. <leader>ct   pick which target to debug
+    3. <leader>cd   build + launch straight into a DAP session
+       -- or --
+    3. <F1>         start via nvim-dap, choose "Debug via CMake (current target)"
+    4. <leader>b    set breakpoints, <F1>/<F2>/<F3> to step
+
+--------------------------------------------------------------------------------
+ RUST (lua/plugins/rust.lua) -- rustaceanvim
+--------------------------------------------------------------------------------
+[n] <leader>rd  Show debuggable targets (rustaceanvim's own DAP integration)
+
+  Note: Rust LSP (rust-analyzer) and most Rust keymaps are provided by
+  rustaceanvim itself via :RustLsp <subcommand> -- see :help rustaceanvim
+  for the full list (e.g. :RustLsp runnables, :RustLsp expandMacro).
+
+--------------------------------------------------------------------------------
+ TYPESCRIPT / JAVASCRIPT (lua/dap/typescript.lua)
+--------------------------------------------------------------------------------
+  No dedicated keymaps -- uses the same universal DAP keys above (F1-F3,
+  <leader>b, etc). Two launch configs are registered per TS/JS filetype,
+  selectable when you press <F1> in a .ts/.tsx/.js/.jsx file:
+    - "Launch file (node)"          run the current file directly
+    - "Attach to running process"   attach to an already-running node process
+
+  IMPORTANT: "Launch file (node)" runs .ts files via ts-node, which must be
+  installed as a dependency IN THE PROJECT you're debugging (npm install -D
+  ts-node), not globally. If it's missing, node will fail to resolve .ts
+  imports -- debug the compiled .js output instead, or add ts-node to the
+  project.
+
+--------------------------------------------------------------------------------
+ TESTING -- Python (lua/plugins/neotest.lua)
+--------------------------------------------------------------------------------
+[n] <leader>tt  Run nearest test
+[n] <leader>tf  Run all tests in current file
+[n] <leader>ts  Toggle test summary panel
+[n] <leader>to  Show test output (opens in a window)
+
+--------------------------------------------------------------------------------
+ HTTP CLIENT -- .http files (lua/plugins/kulala.lua)
+--------------------------------------------------------------------------------
+[n] <leader>rr  Run HTTP request under cursor
+[n] <leader>ra  Run all HTTP requests in file
+[n] <leader>ri  Inspect HTTP request
+[n] <leader>rc  Copy HTTP request as cURL command
+
+--------------------------------------------------------------------------------
+ FILE NAVIGATION
+--------------------------------------------------------------------------------
+[n] <C-n>       Toggle Neo-tree file explorer          (lua/plugins/neotree.lua)
+[n] <C-f>       Telescope: find files                  (lua/plugins/telescope.lua)
+[n] <C-g>       Telescope: live grep                   (lua/plugins/telescope.lua)
+
+--------------------------------------------------------------------------------
+ HARPOON (lua/plugins/harpoon.lua)
+--------------------------------------------------------------------------------
+[n] <leader>a   Add current file to Harpoon list
+[n] <C-e>       Toggle Harpoon quick menu
+[n] <C-p>       Jump to Harpoon file 1
+[n] <C-t>       Jump to Harpoon file 2
+[n] <C-i>       Jump to Harpoon file 3
+[n] <C-y>       Jump to Harpoon file 4
+[n] <C-S-p>     Previous Harpoon file
+[n] <C-o>       Next Harpoon file
+
+--------------------------------------------------------------------------------
+ COMPLETION (insert mode, lua/plugins/cmp.lua)
+--------------------------------------------------------------------------------
+[i] <C-b>       Scroll completion docs up
+[i] <C-t>       Scroll completion docs down
+[i] <C-Space>   Trigger completion menu
+[i] <C-e>       Abort completion
+[i] <CR>        Confirm selected completion
+[i] <Tab>       Next completion item / expand or jump snippet
+[i] <S-Tab>     Previous completion item / jump back in snippet

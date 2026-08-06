@@ -1,0 +1,125 @@
+================================================================================
+ NEOVIM CONFIG IDIOSYNCRASIES
+ Things that look like bugs but aren't, decisions that need explaining,
+ and a record of what changed from the old monolithic init.lua.
+ Companion to KEYMAPS.txt.
+================================================================================
+
+--------------------------------------------------------------------------------
+ KNOWN INTENTIONAL KEY OVERLAPS
+--------------------------------------------------------------------------------
+- <C-t> is bound in THREE contexts: insert-mode completion (scroll docs down,
+  lua/plugins/cmp.lua), normal-mode Harpoon (jump to file 2,
+  lua/plugins/harpoon.lua), and it would also normally open a new tab in
+  vanilla Neovim (overridden here). Mode-scoping keeps these from actually
+  colliding at runtime, but it's worth knowing if <C-t> ever seems to do
+  "the wrong thing" -- check which mode you're in.
+
+- F-keys are split: F1-F3 = DAP (debugging), F4 = terminal toggle,
+  F5-F7 = language runners (Python/FastAPI/pytest). This was a deliberate
+  split during the config reorganization to avoid DAP and the run-scripts
+  colliding on the same keys. If you add more F-key bindings later, F8+ is
+  free.
+
+--------------------------------------------------------------------------------
+ FORMATTING QUIRKS
+--------------------------------------------------------------------------------
+- clang_format (C/C++) has NO explicit style config in conform.lua. It
+  auto-detects a project's .clang-format file by walking up from the current
+  file's directory. If a project has no .clang-format, you silently get
+  clang-format's default LLVM style -- not an error, just a style you might
+  not expect. Run `clang-format --style=google -dump-config > .clang-format`
+  (swap google for llvm/chromium/mozilla/webkit) in a project root to pin a
+  style explicitly.
+
+- Rust formatting deliberately does NOT go through conform.nvim. rustaceanvim
+  wires rustfmt in via rust-analyzer's own LSP formatting request, and
+  <leader>f already triggers LSP formatting as a fallback for any filetype
+  conform doesn't own. Adding `rust = { "rustfmt" }` to conform.lua would be
+  redundant at best and could conflict with rustaceanvim's own formatting
+  options at worst.
+
+- prettier and clang-format are installed via mason-tool-installer, NOT
+  mason-lspconfig -- they're not language servers, so they don't belong in
+  plugins/lsp.lua's ensure_installed list. If :Mason shows them missing,
+  check plugins/conform.lua, not plugins/lsp.lua.
+
+--------------------------------------------------------------------------------
+ DAP / DEBUGGING QUIRKS
+--------------------------------------------------------------------------------
+- TypeScript "Launch file (node)" debugging depends on ts-node being
+  installed AS A PROJECT DEPENDENCY (npm install -D ts-node), not globally.
+  This is easy to forget when jumping into someone else's OSS repo -- if
+  breakpoints don't bind or the debugger errors on import resolution, check
+  for ts-node in that project's node_modules first.
+
+- The C++ DAP config offers two options when you press <F1>: "Debug via
+  CMake (current target)" and "Launch file (manual path)". The CMake option
+  depends on cmake-tools.nvim's Lua API for resolving the selected target,
+  which has shifted across versions of that plugin. If it fails to resolve
+  a target, it falls back to prompting for a manual path -- not a crash,
+  just degraded convenience. If this happens consistently, run
+  `:lua print(vim.inspect(require("cmake-tools")))` and the function name
+  in lua/dap/cpp.lua's cmake_dap_target() may need adjusting.
+
+- Rust does NOT go through lua/dap/*.lua at all -- rustaceanvim manages its
+  own DAP integration entirely separately (triggered via <leader>rd /
+  :RustLsp debuggables), reusing codelldb under the hood. This is also why
+  rust_analyzer is deliberately absent from mason-lspconfig's
+  ensure_installed in plugins/lsp.lua -- rustaceanvim owns Rust's LSP
+  lifecycle entirely, and running a manually-configured rust_analyzer
+  alongside it causes duplicate-server conflicts.
+
+--------------------------------------------------------------------------------
+ STRUCTURAL / LAZY.NVIM QUIRKS
+--------------------------------------------------------------------------------
+- lua/dap/cpp.lua, lua/dap/python.lua, and lua/dap/typescript.lua live
+  OUTSIDE lua/plugins/ on purpose. lazy.nvim auto-scans everything under
+  lua/plugins/ (including subfolders) expecting each file to return a
+  plugin spec table. These three files return a plain module with a
+  setup() function instead -- if they lived inside lua/plugins/, lazy.nvim
+  would error on startup trying to interpret them as plugin specs.
+
+- Language-specific DAP setup (cpp/python/typescript) is called explicitly
+  from lua/plugins/dap/init.lua's config function, rather than being
+  split into separate lazy specs for "mfussenegger/nvim-dap". This is
+  because lazy.nvim merges `opts`/`dependencies`/`keys` across multiple
+  specs for the same plugin, but does NOT merge `config` functions --
+  only the last-loaded one runs, silently discarding the rest. Splitting
+  DAP config into separate specs per language would have caused whichever
+  loaded last to silently overwrite the others' adapter setup.
+
+--------------------------------------------------------------------------------
+ CHANGES FROM THE OLD MONOLITHIC CONFIG (historical record)
+--------------------------------------------------------------------------------
+- FIXED BUG: <C-e> was bound twice in the old init.lua (once to a custom
+  Telescope-based Harpoon picker, once to Harpoon's built-in quick menu).
+  The second binding silently overwrote the first, so the Telescope picker
+  was dead code and never actually ran. Now there's only one <C-e> binding
+  (the quick menu). If you want the Telescope-styled picker back, ask and
+  it can be rebound to <leader>he or similar.
+
+- FIXED BUG: the old lua/plugins/dap.lua never actually loaded. It called
+  require('dap') and set dap.configurations.cpp at the top level, but
+  didn't return a lazy.nvim plugin spec table -- so lazy.nvim never
+  executed it. The C++ debugger was silently non-functional before this
+  refactor, independent of any of the newer feature additions below.
+
+- NEW: All DAP keymaps (F1-F3, <leader>b, <leader>B, <leader>d*) --
+  the old config had no debugging keymaps at all beyond dapui auto-open/close.
+
+- NEW: All CMake keymaps (<leader>c*) -- C++ debugging previously required
+  manually typing the executable path every time.
+
+- NEW: <leader>rd for Rust debuggables. Rust support (rustaceanvim) existed
+  in the old config for LSP only; it had no DAP integration wired up.
+
+- NEW: Full TypeScript/JavaScript toolchain added from scratch -- ts_ls
+  (LSP), prettier (formatting), typescript/tsx/javascript treesitter
+  parsers, and pwa-node DAP debugging (lua/dap/typescript.lua). None of
+  this existed in the old config.
+
+- NEW: clang_format wired into conform.nvim for C/C++ formatting via
+  <leader>f and format-on-save. The old config had no C/C++ formatting at
+  all -- clangd's LSP formatting was the only thing available, and it
+  wasn't explicitly configured.
